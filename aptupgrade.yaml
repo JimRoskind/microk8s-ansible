@@ -1,0 +1,21 @@
+---
+- hosts: all
+  become: yes
+
+  tasks:
+    - name: Do apt update and upgrade
+      apt:
+        upgrade: 'yes'
+        update_cache: yes
+        state: latest
+    
+    - name: See if reboot is needed for each host
+      stat:
+        path: /var/run/reboot-requried
+      register: reboot_required_file
+
+    - name: Skip reboot unless reboot-required file is present
+      reboot:
+      when: reboot_required_file.stat.exists
+
+...

@@ -1,0 +1,24 @@
+---
+- hosts: all
+  # Iterate through all hosts one at a time, so that k8s has time to add the node
+  serial: 1
+
+  tasks:
+    # We always ask the first host to issue commands for use in other nodes.
+    - name: Get a join command from the first node as long as we're not first
+      command:
+        # Just get the list of 3 possible join commands (one per line)
+        cmd: "microk8s add-node --format short"
+      when: ansible_play_hosts[0] != inventory_hostname
+      register: join_command
+      delegate_to: '{{ ansible_play_hosts[0] }}'
+
+    - name: Execute the join command
+      # We could be fancy, and only join when "hostname" is not in the return
+      # result from microk8s.kubectl get nodes.
+      # Currently this call will fail when the node is already joined.
+      command: 
+        cmd: "{{ join_command.stdout_lines[0] }}"
+      when: ansible_play_hosts[0] != inventory_hostname
+    
+...

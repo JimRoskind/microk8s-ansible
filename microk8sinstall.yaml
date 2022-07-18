@@ -1,0 +1,20 @@
+---
+- name Attempt to install microk8s. Command will sometimes fail due to timeout.
+- hosts: all
+  become: yes
+
+  tasks:
+    - name: Snap install of microk8s
+      snap:
+        name: microk8s
+        classic: true
+        state: present
+
+
+    - name: Add user to microk8s group
+      user:
+        name: ubuntu
+        groups: microk8s
+        append: yes
+
+...
