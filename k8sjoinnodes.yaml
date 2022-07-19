@@ -4,14 +4,6 @@
   serial: 1
 
   tasks:
-    - name: Acquire the actual name of current inventory_hostname.
-      # We need this to check to see if it has already joined our cluster.
-      # This is critical to avoid a failure, and be idempotent.
-      command:
-        cmd: hostname
-      register: name_of_current_host
-      changed_when: false
-
     - name: Get list of node hostnames that are already joined
       command:
         cmd: "microk8s.kubectl get nodes"
@@ -23,11 +15,14 @@
       
     - name: Use local variables to increase readability
       set_fact:
-        current_host_regex: "^{{ name_of_current_host.stdout }} "
+        # Search for hostname at start of line, followed by spaces, followed by Ready.
+        # Note that we could fail later if it was not Ready.
+        # It is hard to say what we should do if it is not ready...
+        # ... maybe remove it, and the re-add it??
+        current_host_regex: "^{{ ansible_facts['nodename'] }}[ ]+Ready"
       
     - name: Use local variables to increase readability
       set_fact: 
-        #join_present: "{{ previously_joined_nodes.stdout | regex_search(current_host_regex) }}"
         join_present: "{{ previously_joined_nodes.stdout is regex(current_host_regex, multiline=true) }}"
       
     - name: Get a join command from the first node.
@@ -50,7 +45,7 @@
       # We could also loop through the 3 different join commands we acquired,
       # but that seems unnecessary (I haven't yet seen the failure scenario).
       command: 
-        cmd: "echo {{ join_command.stdout_lines[0] }}"
+        cmd: "{{ join_command.stdout_lines[0] }}"
       when: join_present == false
     
 ...
