@@ -1,16 +1,25 @@
 ---
-- name Attempt to install microk8s. Command will sometimes fail due to timeout.
+- name Attempt to install microk8s.
+#  Command will sometimes fail due to timeout, as snap takes a while.
+#  The good news is that it typically makes incremental progress, and will
+#  eventually succeed.  I should figure out how to adjust the timeout
+#  for the running of the underlying shell command.
+#  When this command completes, the nodes will be running "singleton"
+#  kubernetes clusters, and must still be "joined" together into a
+#  larger cluster.
 - hosts: all
   become: yes
 
   tasks:
     - name: Snap install of microk8s
+      # If this fails with a timeout... just try again <sigh>
       snap:
         name: microk8s
         classic: true
         state: present
 
-
+    # To avoid needing to sudo for microk8s commands, we add this user
+    # to the required group.
     - name: Add user to microk8s group
       user:
         name: ubuntu
