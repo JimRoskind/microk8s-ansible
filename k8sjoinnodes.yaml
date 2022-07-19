@@ -4,21 +4,53 @@
   serial: 1
 
   tasks:
-    # We always ask the first host to issue commands for use in other nodes.
-    - name: Get a join command from the first node as long as we're not first
+    - name: Acquire the actual name of current inventory_hostname.
+      # We need this to check to see if it has already joined our cluster.
+      # This is critical to avoid a failure, and be idempotent.
       command:
-        # Just get the list of 3 possible join commands (one per line)
+        cmd: hostname
+      register: name_of_current_host
+      changed_when: false
+
+    - name: Get list of node hostnames that are already joined
+      command:
+        cmd: "microk8s.kubectl get nodes"
+      # Result will consist of a header line, and one-or-more lines
+      # starting with actual hostnames (that are part of cluster).
+      register: previously_joined_nodes
+      delegate_to: '{{ ansible_play_hosts[0] }}'
+      changed_when: false
+      
+    - name: Use local variables to increase readability
+      set_fact:
+        current_host_regex: "^{{ name_of_current_host.stdout }} "
+      
+    - name: Use local variables to increase readability
+      set_fact: 
+        #join_present: "{{ previously_joined_nodes.stdout | regex_search(current_host_regex) }}"
+        join_present: "{{ previously_joined_nodes.stdout is regex(current_host_regex, multiline=true) }}"
+      
+    - name: Get a join command from the first node.
+      # We always ask the first host to issue fresh join commands for use in
+      # other nodes.
+      # That ensures that all nodes will be connected to that first node, and
+      # hence will transitively all be connected into a single larger cluster
+      
+      command:
+        # Use "format short" to get the list of 3 possible join commands (one
+        # per line) without the human-readable prose.
         cmd: "microk8s add-node --format short"
-      when: ansible_play_hosts[0] != inventory_hostname
+      # We don't need to join the first host to itself.
+      when: join_present == false
       register: join_command
       delegate_to: '{{ ansible_play_hosts[0] }}'
+      changed_when: false
 
-    - name: Execute the join command
-      # We could be fancy, and only join when "hostname" is not in the return
-      # result from microk8s.kubectl get nodes.
-      # Currently this call will fail when the node is already joined.
+    - name: Execute one of join commands that we were given above.
+      # We could also loop through the 3 different join commands we acquired,
+      # but that seems unnecessary (I haven't yet seen the failure scenario).
       command: 
-        cmd: "{{ join_command.stdout_lines[0] }}"
-      when: ansible_play_hosts[0] != inventory_hostname
+        cmd: "echo {{ join_command.stdout_lines[0] }}"
+      when: join_present == false
     
 ...
