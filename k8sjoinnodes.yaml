@@ -13,37 +13,39 @@
       delegate_to: '{{ ansible_play_hosts[0] }}'
       changed_when: false
       
-    - name: Use local variables to increase readability
+    - name: Create a regular expression to search for current node in get nodes list.
       set_fact:
         # Search for hostname at start of line, followed by spaces, followed by Ready.
-        # Note that we could fail later if it was not Ready.
-        # It is hard to say what we should do if it is not ready...
-        # ... maybe remove it, and the re-add it??
+        # Note that a NotReady node (resulting from a "microk8s leave") can be
+        # added back without inducing an error.
         current_host_regex: "^{{ ansible_facts['nodename'] }}[ ]+Ready"
       
-    - name: Use local variables to increase readability
+    - name: Isolate the line (if any) in "get nodes" list that includes current node.
       set_fact: 
-        join_present: "{{ previously_joined_nodes.stdout is regex(current_host_regex, multiline=true) }}"
+        join_present: >
+          "{{ previously_joined_nodes.stdout is
+          regex(current_host_regex, multiline=true) }}"
       
-    - name: Get a join command from the first node.
+    - name: Get a usable join command from the first node.
       # We always ask the first host to issue fresh join commands for use in
       # other nodes.
       # That ensures that all nodes will be connected to that first node, and
       # hence will transitively all be connected into a single larger cluster
-      
       command:
         # Use "format short" to get the list of 3 possible join commands (one
         # per line) without the human-readable prose.
         cmd: "microk8s add-node --format short"
-      # We don't need to join the first host to itself.
+      # Note: First node will list itself, and be excluded
       when: join_present == false
       register: join_command
       delegate_to: '{{ ansible_play_hosts[0] }}'
+      # This command doesn't actually change anything (yet).
       changed_when: false
 
     - name: Execute one of join commands that we were given above.
       # We could also loop through the 3 different join commands we acquired,
       # but that seems unnecessary (I haven't yet seen the failure scenario).
+      # This will modify both current_node, and the cluster.
       command: 
         cmd: "{{ join_command.stdout_lines[0] }}"
       when: join_present == false
