@@ -6,8 +6,8 @@
   tasks:
     - name: Get list of node hostnames that are already joined
       command:
-        cmd: "microk8s.kubectl get nodes"
-      # Result will consist of a header line, and one-or-more lines
+        cmd: "microk8s.kubectl get nodes --no-headers"
+      # Result will consist of one-or-more lines
       # starting with actual hostnames (that are part of cluster).
       register: previously_joined_nodes
       delegate_to: '{{ ansible_play_hosts[0] }}'
