@@ -11,10 +11,9 @@
 
   tasks:
     - name: Capture cgroup status
-      command:
-        cmd: "cat /proc/cgroups"
+      slurp:
+        src: /proc/cgroups
       register: cgroup_file
-      changed_when: false
 
     - name: Validate cgroup_memory was set (done by default in new Ubuntu release)
       assert:
