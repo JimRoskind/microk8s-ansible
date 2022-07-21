@@ -1,0 +1,25 @@
+---
+# Install a functional version of Docker.
+# I selected docker.io (rather than docker.ce) as
+# this seemed to be the open source (and now supported
+# variant.
+- hosts: all
+  become: yes
+
+  tasks:
+    - name: Do actuial install using apt libraries
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600  # Don't run more than once an hour
+
+    # To avoid needing to sudo for docker commands, we add this user
+    # to the required group.
+    - name: Add user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+...
