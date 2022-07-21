@@ -1,5 +1,4 @@
 ---
-- name Attempt to install microk8s.
 #  Command will sometimes fail due to timeout, as snap takes a while.
 #  The good news is that it typically makes incremental progress, and will
 #  eventually succeed.  I should figure out how to adjust the timeout
@@ -11,6 +10,20 @@
   become: yes
 
   tasks:
+    - name: Capture cgroup status
+      command:
+        cmd: "cat /proc/cgroups"
+      register: cgroup_file
+      changed_when: false
+
+    - name: Validate cgroup_memory was set (done by default in new Ubuntu release)
+      assert:
+        that:
+          - "cgroup_file.stdout is regex('^memory\t.*\t1$', multiline=true)"
+        fail_msg: >
+          "Append to /boot/firmware/cmdline.txt the commands
+          cgroup_enable=memory cgroup_memory=1"
+
     - name: Snap install of microk8s
       # If this fails with a timeout... just try again <sigh>
       snap:
