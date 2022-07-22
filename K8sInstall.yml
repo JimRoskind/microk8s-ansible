@@ -9,20 +9,114 @@
 - hosts: sample
   become: yes
 
-  tasks:
-    - name: Capture cgroup status
-      command:
-        cmd: "cat /proc/cgroups"
-      register: cgroup_file
-      changed_when: false
 
-    - name: Validate cgroup_memory was set (done by default in new Ubuntu release)
+
+
+  tasks:
+      # Raspian puts cmdline.txt in /boot/., while ubuntu has /boot/firmware/.
+      # Note that there is no such directory on Raspian
+    - name: Detect presence of Ubuntu directory /boot/firmware
+      stat:
+        path: /boot/firmware/cmdline.txt
+      register: firmware_cmdline
+
+    - name: Tentatiely indicate where to find cmdline.txt file.
+      set_fact:
+        cmdline_file_path: /boot/cmdline.txt
+
+    - name: Optionally correct to indicate ubuntu location
+      set_fact:
+        cmdline_file_path: /boot/firmware/cmdline.txt
+      when:
+        - firmware_cmdline.stat.exists
+
+    - name: Check to see if cgroup_memory is already enabled
+      lineinfile:
+        path: /proc/cgroups
+        regex: '^memory\t.*\t1$'
+        state: present
+        line: "If there would be a change, then we have cgroup_memory enabled"
+      check_mode: yes
+      register: mem_cgroup_present
+
+    - name: Prepare to read in cmdline.txt (and be ready to verify it exists.
+      stat:
+        path: "{{ cmdline_file_path }}"
+      register: cmdline_file
+      when:
+        - not mem_cgroup_present.changed
+
+    - name: Read in cmdline.txt
+      command:
+        cmd: "cat {{ cmdline_file_path }}"
+      register: cmdline_contents
+      changed_when: false
+      when:
+        - not mem_cgroup_present.changed
+        - cmdline_file.stat.exists
+
+    - name: Augment cmdline.txt with options if necessary
+      lineinfile:
+        path: "{{ cmdline_file_path }}"
+        regex: '^(.*)'
+        line: '\1 {{ option }}'
+        backrefs: true
+      loop_control:
+        loop_var: option
+        label: "{{ option }}"
+      loop:
+        - cgroup_enable=memory
+        - cgroup_memory=1
+      when:
+        - not mem_cgroup_present.changed
+        - cmdline_file.stat.exists
+        - option not in cmdline_contents.stdout
+      register: cmdline_file_edit
+
+    - name: Reboot if boot option changed
+      reboot:
+      when:
+        - cmdline_file_edit.changed
+
+    - name: Validate cgroup_memory was really set
+      lineinfile:
+        path: /proc/cgroups
+        regex: '^memory\t.*\t1$'
+        state: absent
+      check_mode: yes
+      when:
+        - not mem_cgroup_present.changed
+      register: mem_cgroup_finally_present
+
+    - name: Assert that cgroup_memory was really found (enabled) now
       assert:
         that:
-          - "cgroup_file.stdout is regex('^memory\t.*\t1$', multiline=true)"
+          - false
         fail_msg: >
           "Append to /boot/firmware/cmdline.txt the commands
           cgroup_enable=memory cgroup_memory=1"
+      when:
+        - not mem_cgroup_finally_present.skipped
+        - not mem_cgroup_finally_present.changed
+
+    - name: Ensure that snap is available
+      apt:
+        name: snapd
+        state: latest
+      register: snapd_installation
+
+    - name: Reboot if snapd was installed
+      reboot:
+        reboot_timeout: 90
+      when:
+        - snapd_installation.changed
+
+    - name: Install snap core if we did an install of snap
+      snap:
+        name: core
+        state: present
+      when:
+        - snapd_installation.changed
 
     - name: Snap install of microk8s
       # If this fails with a timeout... just try again <sigh>
