@@ -6,14 +6,15 @@
 #  When this command completes, the nodes will be running "singleton"
 #  kubernetes clusters, and must still be "joined" together into a
 #  larger cluster.
-- hosts: all
+- hosts: sample
   become: yes
 
   tasks:
     - name: Capture cgroup status
-      slurp:
-        src: /proc/cgroups
+      command:
+        cmd: "cat /proc/cgroups"
       register: cgroup_file
+      changed_when: false
 
     - name: Validate cgroup_memory was set (done by default in new Ubuntu release)
       assert:
@@ -34,7 +35,7 @@
     # to the required group.
     - name: Add user to microk8s group
       user:
-        name: ubuntu
+        name: "{{ ansible_user }}"
         groups: microk8s
         append: yes
 
