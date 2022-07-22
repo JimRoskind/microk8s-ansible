@@ -3,7 +3,7 @@
 # I selected docker.io (rather than docker.ce) as
 # this seemed to be the open source (and now supported
 # variant.
-- hosts: all
+- hosts: sample
   become: yes
 
   tasks:
@@ -18,7 +18,7 @@
     # to the required group.
     - name: Add user to docker group
       user:
-        name: ubuntu
+        name: "{{ ansible_user }}"
         groups: docker
         append: yes
 
