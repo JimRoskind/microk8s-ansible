@@ -6,7 +6,7 @@
 #  When this command completes, the nodes will be running "singleton"
 #  kubernetes clusters, and must still be "joined" together into a
 #  larger cluster.
-- hosts: sample
+- hosts: all
   become: yes
 
 
@@ -30,6 +30,7 @@
       when:
         - firmware_cmdline.stat.exists
 
+    # I could use the lookup('ansible.bulitin.csvfile', 'memory file=/proc/cgroups delimeter=" " col=4 default=0')
     - name: Check to see if cgroup_memory is already enabled
       lineinfile:
         path: /proc/cgroups
@@ -111,12 +112,17 @@
       when:
         - snapd_installation.changed
 
+    - name: Ensure snapd is running
+      service:
+        name: snapd
+        state: started
+        enabled: true
+      register: snapd_running
+
     - name: Install snap core if we did an install of snap
       snap:
         name: core
         state: present
-      when:
-        - snapd_installation.changed
 
     - name: Snap install of microk8s
       # If this fails with a timeout... just try again <sigh>
@@ -132,5 +138,30 @@
         name: "{{ ansible_user }}"
         groups: microk8s
         append: yes
+
+    - name: Hack workaround for problem in delegate_to
+      # It always assumes that python is found in the SAME place on the delegated host,
+      # which is commonly /usr/bin/python.  The hack is to link that host name to
+      # the available python3 if the file is not present.
+      # Ubuntu has /usr/bin/python, but Raspian only has /usr/bin/python3
+      stat:
+        path: /usr/bin/python
+      register: python2_executable
+
+    - name: Optionally install the link so that delegate can work :-/
+      # This is a hack to cover for the (current) fact that delegation
+      # between Raspian nodes and Ubuntu nodes won't quite work, since
+      # Raspian didn't bother to include anything as user/bin/python.
+      # We need this when we join nodes, because we delegate to get
+      # new add node commands, and to get a list of existing nodes.
+      file:
+        dest: /usr/bin/python
+        src: /usr/bin/python3
+        state: link
+        owner: root
+        group: root
+        mode: '0755'
+      when:
+        - not python2_executable.stat.exists
 
 ...
