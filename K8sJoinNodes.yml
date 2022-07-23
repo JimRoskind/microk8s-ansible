@@ -2,11 +2,14 @@
 - hosts: all
   # Iterate through all hosts one at a time, so that k8s has time to add the node
   serial: 1
+  order: sorted
+  # Note: Ubuntu will find the microk8s via "command," while Raspian
+  # doesn't seem to have a full login path, and needs /snap/bin/microk8s.
 
   tasks:
     - name: Get list of node hostnames that are already joined
       command:
-        cmd: "microk8s.kubectl get nodes --no-headers"
+        cmd: "/snap/bin/microk8s.kubectl get nodes --no-headers"
       # Result will consist of one-or-more lines
       # starting with actual hostnames (that are part of cluster).
       register: previously_joined_nodes
@@ -21,11 +24,15 @@
         current_host_regex: "^{{ ansible_facts['nodename'] }}[ ]+Ready"
       
     - name: Isolate the line (if any) in "get nodes" list that includes current node.
+      # Hack alert: I wanted to get a boolean setting, but the result
+      # ended up being a quoted True\n or False\n.  I couldn't figure
+      # out how to get a bool, so I adjusted the "when:" commands that
+      # come later to test for inclusion of "False."
       set_fact: 
         join_present: >
-          "{{ previously_joined_nodes.stdout is
-          regex(current_host_regex, multiline=true) }}"
-      
+          {{ previously_joined_nodes.stdout is
+          regex(current_host_regex, multiline=true) }}
+
     - name: Get a usable join command from the first node.
       # We always ask the first host to issue fresh join commands for use in
       # other nodes.
@@ -34,20 +41,25 @@
       command:
         # Use "format short" to get the list of 3 possible join commands (one
         # per line) without the human-readable prose.
-        cmd: "microk8s add-node --format short"
+        cmd: "/snap/bin/microk8s add-node --format short"
       # Note: First node will list itself, and be excluded
-      when: join_present == false
+      when:
+        - join_present is match('False')
       register: join_command
       delegate_to: '{{ ansible_play_hosts[0] }}'
       # This command doesn't actually change anything (yet).
       changed_when: false
 
     - name: Execute one of join commands that we were given above.
-      # We could also loop through the 3 different join commands we acquired,
-      # but that seems unnecessary (I haven't yet seen the failure scenario).
-      # This will modify both current_node, and the cluster.
+      # On Ubuntu, the provided command just worked.  With Raspian, I
+      # didn't get the /snap/bin on my path, so I had to put it here
+      # explicitly (for portability?).
+      # We just used the first of the given commands.
+      # Note that this WILL modify all the nodes in the cluster with
+      # the realization that we are "Ready," which also means this is
+      # a slow command.
       command: 
-        cmd: "{{ join_command.stdout_lines[0] }}"
-      when: join_present == false
-    
+        cmd: "/snap/bin/{{ join_command.stdout_lines[0] }}"
+      when:
+        - join_present is match('False')
 ...
