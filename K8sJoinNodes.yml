@@ -50,6 +50,18 @@
       # This command doesn't actually change anything (yet).
       changed_when: false
 
+    - name: Execute a leave command to avoid problems
+      # When a bad state is reached, the cluster will know about the
+      # current node, and be upset about the attempte (re)join.
+      # Execution of leave ensures that we have a new/clean cluster
+      # id, and the join will always(?) succeed.
+      # It slows things down... but avoids occaisional problems.
+      command:
+        cmd: "/snap/bin/microk8s leave"
+      when:
+        - join_present is match('False')
+
+    
     - name: Execute one of join commands that we were given above.
       # On Ubuntu, the provided command just worked.  With Raspian, I
       # didn't get the /snap/bin on my path, so I had to put it here
