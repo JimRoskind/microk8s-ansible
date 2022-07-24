@@ -136,6 +136,10 @@
 
     - name: Snap install of microk8s
       # If this fails with a timeout... just try again <sigh>
+      # This is a documented (on web) problem with Ubuntu.
+      # They are talking about raising the timeout limit in
+      # snap, but they say it is hard to do :-/.
+      # it will not timeout with Raspian.
       snap:
         name: microk8s
         classic: true
