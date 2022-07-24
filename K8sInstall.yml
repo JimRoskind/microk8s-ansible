@@ -9,9 +9,6 @@
 - hosts: all
   become: yes
 
-
-
-
   tasks:
       # Raspian puts cmdline.txt in /boot/., while ubuntu has /boot/firmware/.
       # Note that there is no such directory on Raspian
@@ -101,9 +98,12 @@
         - not mem_cgroup_finally_present.changed
 
     - name: Ensure that snap is available
+      # Note that some sites suggest "fuse" and "udev"
+      # "udev" is already installed on both Raspian and Ubuntu
+      # "fuse" is present on Raspian, but "fuse3" is used on Ubuntu
       apt:
         name: snapd
-        state: latest
+        state: present
       register: snapd_installation
 
     - name: Reboot if snapd was installed
@@ -119,7 +119,7 @@
         enabled: true
       register: snapd_running
 
-    - name: Install snap core if we did an install of snap
+    - name: Ensure presence of snap core
       snap:
         name: core
         state: present
