@@ -1,0 +1,30 @@
+---
+# Raspian puts cmdline.txt in /boot/., while Ubuntu has
+# /boot/firmware/.  Note that there is no such directory on Raspian.
+# When this playlist completes, the cmdline_file_path var will (as
+# asserted) point to the actual file.
+- name: Tentatiely indicate where to find cmdline.txt file.
+  set_fact:
+    cmdline_file_path: /boot/firmware/cmdline.txt
+
+- name: Detect presence of Ubuntu directory /boot/firmware/cmdline.txt
+  stat:
+    path: "{{ cmdline_file_path }}"
+  register: firmware_cmdline
+
+- name: Optionally correct to indicate ubuntu location
+  set_fact:
+    cmdline_file_path: /boot/cmdline.txt
+  when:
+    - not firmware_cmdline.stat.exists
+
+- name: Detect presence of Ubuntu directory /boot/firmware/cmdline.txt
+  stat:
+    path: "{{ cmdline_file_path }}"
+  register: cmdline_path_valid
+
+- name: Ensure we have the cmdline.txt path correct.
+  assert:
+    that:
+      cmdline_path_valid.stat.exists
+...

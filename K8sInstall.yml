@@ -1,67 +1,36 @@
 ---
-#  Command will sometimes fail due to timeout, as snap takes a while.
-#  The good news is that it typically makes incremental progress, and will
-#  eventually succeed.  I should figure out how to adjust the timeout
-#  for the running of the underlying shell command.
-#  When this command completes, the nodes will be running "singleton"
+#  When this playlist completes, the nodes will be running "singleton"
 #  kubernetes clusters, and must still be "joined" together into a
 #  larger cluster.
 - hosts: all
   become: yes
 
-  tasks:
-      # Raspian puts cmdline.txt in /boot/., while ubuntu has /boot/firmware/.
-      # Note that there is no such directory on Raspian
-    - name: Tentatiely indicate where to find cmdline.txt file.
-      set_fact:
-        cmdline_file_path: /boot/firmware/cmdline.txt
-
-    - name: Detect presence of Ubuntu directory /boot/firmware/cmdline.txt
-      stat:
-        path: "{{ cmdline_file_path }}"
-      register: firmware_cmdline
-
-    - name: Optionally correct to indicate ubuntu location
-      set_fact:
-        cmdline_file_path: /boot/cmdline.txt
-      when:
-        - not firmware_cmdline.stat.exists
-
-    - name: Detect presence of Ubuntu directory /boot/firmware/cmdline.txt
-      stat:
-        path: "{{ cmdline_file_path }}"
-      register: cmdline_path_valid
-
-    - name: Ensure we have the cmdline.txt path correct.
-      assert:
-        that:
-          cmdline_path_valid.stat.exists
-
-    # I could use the lookup('ansible.bulitin.csvfile', 'memory file=/proc/cgroups delimeter=" " col=4 default=0')
+  tasks:  
     - name: Check to see if cgroup_memory is already enabled
+      #  I could use the lookup('ansible.bulitin.csvfile', 'memory
+      #  file=/proc/cgroups delimeter=" " col=4 default=0') ...but
+      #  I'll just use a regex here.
       lineinfile:
         path: /proc/cgroups
         regex: '^memory\t.*\t1$'
         state: absent
-        line: "If there would be a change, then we have cgroup_memory enabled"
+        line: "If there would be a change, then cgroup_memory enabled"
       check_mode: yes
       register: mem_cgroup_present
 
-    - name: Prepare to read in cmdline.txt (and be ready to verify it exists.
-      stat:
-        path: "{{ cmdline_file_path }}"
-      register: cmdline_file
+    - name: Get the fact indicating location of cmdline.txt
+      include_tasks:
+        file: FindCmdLineTextPath.yml
       when:
         - not mem_cgroup_present.changed
 
-    - name: Read in cmdline.txt
+    - name: Read in cmdline.txt (to ensure we add options only once)
       command:
         cmd: "cat {{ cmdline_file_path }}"
       register: cmdline_contents
       changed_when: false
       when:
         - not mem_cgroup_present.changed
-        - cmdline_file.stat.exists
 
     - name: Augment cmdline.txt with options if necessary
       lineinfile:
@@ -77,8 +46,7 @@
         - cgroup_memory=1
       when:
         - not mem_cgroup_present.changed
-        - cmdline_file.stat.exists
-        - option not in cmdline_contents.stdout
+        - option not in cmdline_contents.stdout  # Avoid dups
       register: cmdline_file_edit
 
     - name: Reboot if boot option changed
@@ -86,7 +54,7 @@
       when:
         - cmdline_file_edit.changed
 
-    - name: Validate cgroup_memory was really set
+    - name: Validate cgroup_memory is now really set
       lineinfile:
         path: /proc/cgroups
         regex: '^memory\t.*\t1$'
