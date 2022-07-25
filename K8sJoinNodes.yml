@@ -5,6 +5,8 @@
   order: sorted
   # Note: Ubuntu will find the microk8s via "command," while Raspian
   # doesn't seem to have a full login path, and needs /snap/bin/microk8s.
+  # Problem(?) stems from /etc/environment not existing on Raspian.
+  # That is where snap would typically update the system-wide file path.
 
   tasks:
     - name: Get list of node hostnames that are already joined
