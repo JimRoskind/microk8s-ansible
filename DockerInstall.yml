@@ -3,7 +3,7 @@
 # I selected docker.io (rather than docker.ce) as
 # this seemed to be the open source (and now supported
 # variant.
-- hosts: sample
+- hosts: all
   become: yes
 
   tasks:
