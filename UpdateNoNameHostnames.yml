@@ -1,0 +1,20 @@
+---
+- name: Evaluate probable hostnumber
+  set_fact:
+    hostnumber: "{{ (ansible_default_ipv4.address.split('.')[3] | int) - 200 }}"
+
+- name: Create plausible hostname
+  set_fact:
+    hostname: "obi{{ hostnumber }}"
+
+- name: Show potential hostname
+  debug:
+    msg: "New hostname will be {{ hostname }}"
+
+- name:  Rewrite hostname file
+  shell:
+    cmd: "echo {{ hostname }} >/etc/hostname"
+
+- name: Reboot to update machine's hostname
+  reboot:
+...
