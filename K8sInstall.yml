@@ -20,7 +20,7 @@
 
     - name: Get the fact indicating location of cmdline.txt
       include_tasks:
-        file: FindCmdLineTextPath.yml
+        file: FindCmdLineTxtPath.yml
       when:
         - not mem_cgroup_present.changed
 
@@ -120,5 +120,4 @@
         name: "{{ ansible_user }}"
         groups: microk8s
         append: yes
-
 ...
