@@ -25,25 +25,25 @@
 
     - name: Get current reasonable path
       shell:
-        cmd: "echo $PATH"
+        cmd: "echo -n $PATH"
       register: reasonable_path
       become: no
       when:
         - not environment_path_present.changed
       changed_when: false
 
-    - name: Optionally insert PATH into /etc/environment
-      lineinfile:
-        path: /etc/environment
-        regex: "^PATH=(.*)$"
-        line: "PATH={{ reasonable_path.stdout }}"
-        state: present
-        owner: root
-        group: root
-        mode: '0644'
-        create: yes
-      when:
-        - not environment_path_present.changed
+#    - name: Optionally insert PATH into /etc/environment
+#      lineinfile:
+#        path: /etc/environment
+#        regex: "^PATH=(.*)$"
+#        line: "PATH={{ reasonable_path.stdout }}"
+#        state: present
+#        owner: root
+#        group: root
+#        mode: '0644'
+#        create: yes
+#      when:
+#        - not environment_path_present.changed
 
     - name: Upgrade apt installation if needed
       apt:
