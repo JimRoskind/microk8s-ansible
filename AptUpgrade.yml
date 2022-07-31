@@ -14,37 +14,6 @@
       import_tasks: "UpdateNoNameHostnames.yml"
       when: (old_hostname.stdout) is match('NoName')
 
-    - name: Decide if we need to add PATH to environment file
-      # Note that Raspian sometimes doesn't have such a file!?
-      lineinfile:
-        path: /etc/environment
-        regex: "^PATH=.*$"
-        state: absent   # See if it would take a change to delete PATH
-      check_mode: yes
-      register: environment_path_present
-
-    - name: Get current reasonable path
-      shell:
-        cmd: "echo -n $PATH"
-      register: reasonable_path
-      become: no
-      when:
-        - not environment_path_present.changed
-      changed_when: false
-
-#    - name: Optionally insert PATH into /etc/environment
-#      lineinfile:
-#        path: /etc/environment
-#        regex: "^PATH=(.*)$"
-#        line: "PATH={{ reasonable_path.stdout }}"
-#        state: present
-#        owner: root
-#        group: root
-#        mode: '0644'
-#        create: yes
-#      when:
-#        - not environment_path_present.changed
-
     - name: Upgrade apt installation if needed
       apt:
         upgrade: 'yes'
@@ -54,7 +23,7 @@
     
     - name: See if reboot is now needed
       stat:
-        path: /var/run/reboot-requried
+        path: /var/run/reboot-required
       register: reboot_required_file
 
     - name: Skip reboot unless reboot-required file is present

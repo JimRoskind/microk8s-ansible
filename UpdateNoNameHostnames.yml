@@ -15,6 +15,17 @@
   shell:
     cmd: "echo {{ hostname }} >/etc/hostname"
 
+- name: Fixup /etc/hosts file
+  lineinfile:
+    path: /etc/hosts
+    regex: '^([0-9.]+ )NoName.*$'
+    line: '\1{{ hostname }}'
+    backrefs: yes
+    state: present
+
+# When /etc/cloud directory is present, such as with Ubuntu, more
+# work is needed to preserve the host name.
+
 - name: Reboot to update machine's hostname
   reboot:
 ...
